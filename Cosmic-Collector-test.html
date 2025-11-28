@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cosmic Collector</title>
+    <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+    <style>
+        /* General Styling for a cool space/arcade theme */
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background: #111;
+            color: #fff;
+            font-family: 'VT323', monospace;
+            overflow: hidden;
+        }
+
+        .game-container {
+            background: #000;
+            border: 4px solid #00f0ff;
+            box-shadow: 0 0 20px #00f0ff;
+            padding: 20px;
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            max-width: 90vw;
+            width: 500px;
+            transition: all 0.3s ease;
+        }
+        
+        /* Fullscreen styles for the game container */
+        .game-container:fullscreen {
+            width: 100vw;
+            height: 100vh;
+            max-width: 100vw;
+            border: none;
+            box-shadow: none;
+            border-radius: 0;
+            padding: 0;
+            background: #000;
+            /* Recenter content */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        h1 {
+            color: #00ff88;
+            text-shadow: 0 0 5px #00ff88;
+            margin-bottom: 10px;
+            font-size: 2.5rem;
+        }
+
+        #canvas {
+            display: block;
+            background: linear-gradient(to top, #000000, #0a0a20);
+            border: 2px solid #333;
+            border-radius: 6px;
+            touch-action: none; /* Important for preventing mobile scrolling */
+        }
+
+        .info-bar {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            font-size: 1.5rem;
+        }
+
+        button {
+            background-color: #ff0077;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1.2rem;
+            font-family: 'VT323', monospace;
+            box-shadow: 0 4px #c2005b;
+            transition: all 0.1s;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            justify-content: center;
+        }
+
+        button:hover {
+            background-color: #ff3399;
+        }
+        
+        button:active {
+            box-shadow: 0 1px #c2005b;
+            transform: translateY(3px);
+        }
+
+        /* Modal/Message Box Styling (instead of alert) */
+        .message-box {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.9);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .message-content {
+            background: #222;
+            border: 5px solid #ff0077;
+            padding: 30px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 0 30px #ff0077;
+        }
+
+        .message-content h2 {
+            color: #ff0077;
+            margin-bottom: 15px;
+            font-size: 3rem;
+        }
+        
+        /* Mobile Controls */
+        .controls {
+            display: none;
+            width: 100%;
+            justify-content: space-around;
+            padding-top: 15px;
+        }
+
+        .control-button {
+            font-size: 2rem;
+            padding: 10px 30px;
+            margin: 5px;
+            background-color: #00f0ff;
+            color: #000;
+            box-shadow: 0 4px #00aaff;
+            user-select: none; /* Prevent text selection on touch */
+            touch-action: manipulation; /* Optimizes for touch */
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 600px) {
+            .game-container {
+                padding: 10px;
+                border-width: 2px;
+                width: 100%;
+                max-width: 100%;
+                box-shadow: none;
+            }
+            .controls {
+                display: flex;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="game-container">
+        <h1>Cosmic Collector</h1>
+        
+        <div class="info-bar">
+            <span id="score">SCORE: 0</span>
+            <span id="highScore">HIGH SCORE: 0</span>
+        </div>
+
+        <canvas id="canvas"></canvas>
+        
+        <!-- Updated button group -->
+        <div class="button-group">
+            <button id="startButton">START GAME</button>
+            <button id="fullscreenButton">FULL SCREEN</button>
+        </div>
+        
+        <!-- Mobile Controls -->
+        <div class="controls">
+            <button class="control-button" id="leftButton">&larr;</button>
+            <button class="control-button" id="rightButton">&rarr;</button>
+        </div>
+
+    </div>
+
+    <!-- Game Over/Message Box -->
+    <div class="message-box" id="messageBox">
+        <div class="message-content">
+            <h2 id="messageTitle"></h2>
+            <p id="messageText"></p>
+            <button onclick="startGame()">RETRY</button>
+        </div>
+    </div>
+
+    <script>
+        // --- Canvas Setup ---
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const infoBar = document.querySelector('.info-bar');
+        
+        // --- Game State Variables ---
+        let gameRunning = false;
+        let score = 0;
+        let highScore = localStorage.getItem('cosmicCollectorHighScore') || 0;
+        let objects = [];
+        let objectInterval;
+        let animationFrameId;
+
+        // --- Player (Collector) Settings ---
+        let playerWidth = 60;
+        let playerHeight = 15;
+        let playerX = 0;
+        let playerSpeed = 8;
+        let isMovingLeft = false;
+        let isMovingRight = false;
+        
+        // --- Object Settings ---
+        const OBJECT_SPAWN_RATE = 1000; // ms
+        const MIN_FALL_SPEED = 2;
+        const MAX_FALL_SPEED = 5;
+        const OBJECT_SIZE = 15;
+
+        // --- DOM Elements ---
+        const scoreDisplay = document.getElementById('score');
+        const highScoreDisplay = document.getElementById('highScore');
+        const startButton = document.getElementById('startButton');
+        const fullscreenButton = document.getElementById('fullscreenButton'); // New
+        const gameContainer = document.querySelector('.game-container'); // New
+        const messageBox = document.getElementById('messageBox');
+        const messageTitle = document.getElementById('messageTitle');
+        const messageText = document.getElementById('messageText');
+        
+        // --- Game Initialization and Resizing ---
+
+        function resizeCanvas() {
+            // Set canvas size based on container width but limit max size
+            // We use the container's *current* dimensions, which will expand in fullscreen
+            const containerRect = canvas.parentElement.getBoundingClientRect();
+            const width = containerRect.width - 40; // Account for container padding
+            const height = containerRect.height * 0.7; // Use a ratio of the container height
+            
+            // Calculate size to fit container while maintaining aspect ratio (e.g., 1:1.2)
+            const aspectRatio = 1 / 1.2;
+            let size;
+
+            // Determine if the width or height constraint is tighter
+            if (width * aspectRatio < height) {
+                // Width constraint is tighter, use width
+                size = Math.min(500, width);
+            } else {
+                // Height constraint is tighter, use height / 1.2
+                size = Math.min(500, height / 1.2);
+            }
+            
+            // Apply the new calculated size
+            canvas.width = size;
+            canvas.height = size * 1.2; 
+            
+            // Re-center player on resize
+            playerX = (canvas.width - playerWidth) / 2;
+        }
+
+        window.addEventListener('load', () => {
+            resizeCanvas();
+            highScoreDisplay.textContent = `HIGH SCORE: ${highScore}`;
+            showStartMessage();
+        });
+        window.addEventListener('resize', resizeCanvas);
+
+        // Listen for fullscreen state changes (e.g., if user presses ESC)
+        document.addEventListener('fullscreenchange', handleFullscreenChange);
+        document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+        document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+        document.addEventListener('msfullscreenchange', handleFullscreenChange);
+
+        function handleFullscreenChange() {
+            // Re-call resize logic whenever fullscreen state changes
+            resizeCanvas(); 
+            if (!document.fullscreenElement) {
+                // Exited fullscreen
+                fullscreenButton.textContent = 'FULL SCREEN';
+            } else {
+                // Entered fullscreen
+                fullscreenButton.textContent = 'EXIT FULL SCREEN';
+            }
+        }
+        
+        // --- Fullscreen Logic ---
+        function toggleFullScreen() {
+            const element = gameContainer; 
+
+            if (!document.fullscreenElement) {
+                // Enter Fullscreen
+                if (element.requestFullscreen) {
+                    element.requestFullscreen();
+                } else if (element.mozRequestFullScreen) { /* Firefox */
+                    element.mozRequestFullScreen();
+                } else if (element.webkitRequestFullscreen) { /* Chrome, Safari and Opera */
+                    element.webkitRequestFullscreen();
+                } else if (element.msRequestFullscreen) { /* IE/Edge */
+                    element.msRequestFullscreen();
+                }
+            } else {
+                // Exit Fullscreen
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                } else if (document.mozCancelFullScreen) { /* Firefox */
+                    document.mozCancelFullScreen();
+                } else if (document.webkitExitFullscreen) { /* Chrome, Safari and Opera */
+                    document.webkitExitFullscreen();
+                } else if (document.msExitFullscreen) { /* IE/Edge */
+                    document.msExitFullscreen();
+                }
+            }
+        }
+
+
+        // --- Game Logic Functions ---
+
+        class FallingObject {
+            constructor() {
+                this.x = Math.random() * (canvas.width - OBJECT_SIZE);
+                this.y = 0;
+                this.size = OBJECT_SIZE;
+                // Type 0: Gem (Good), Type 1: Debris (Bad)
+                this.type = Math.random() > 0.3 ? 0 : 1;
+                this.color = this.type === 0 ? '#00ff88' : '#ff0077';
+                this.speed = MIN_FALL_SPEED + Math.random() * (MAX_FALL_SPEED - MIN_FALL_SPEED);
+            }
+
+            draw() {
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                if (this.type === 0) {
+                    // Gem (Diamond/Hexagon shape approximation)
+                    const halfSize = this.size / 2;
+                    ctx.moveTo(this.x + halfSize, this.y);
+                    ctx.lineTo(this.x + this.size, this.y + halfSize);
+                    ctx.lineTo(this.x + halfSize, this.y + this.size);
+                    ctx.lineTo(this.x, this.y + halfSize);
+                    ctx.closePath();
+                } else {
+                    // Debris (Asteroid/Circle shape)
+                    ctx.arc(this.x + this.size / 2, this.y + this.size / 2, this.size / 2, 0, Math.PI * 2);
+                }
+                ctx.fill();
+                // Add a glow effect
+                ctx.shadowColor = this.color;
+                ctx.shadowBlur = 10;
+                ctx.fillStyle = this.color;
+                ctx.fillRect(this.x, this.y, 1, 1); // Draw a tiny dot to force the shadow render
+                ctx.shadowBlur = 0;
+            }
+
+            update() {
+                this.y += this.speed;
+            }
+        }
+
+        function spawnObject() {
+            if (gameRunning) {
+                objects.push(new FallingObject());
+            }
+        }
+
+        function drawPlayer() {
+            ctx.fillStyle = '#00f0ff';
+            ctx.fillRect(playerX, canvas.height - playerHeight, playerWidth, playerHeight);
+            
+            // Add a light trail/glow effect
+            ctx.shadowColor = '#00f0ff';
+            ctx.shadowBlur = 15;
+            ctx.fillStyle = '#00f0ff';
+            ctx.fillRect(playerX + playerWidth / 2, canvas.height - playerHeight - 1, 1, 1);
+            ctx.shadowBlur = 0;
+        }
+
+        function updatePlayerPosition() {
+            if (isMovingLeft) {
+                playerX -= playerSpeed;
+            }
+            if (isMovingRight) {
+                playerX += playerSpeed;
+            }
+
+            // Boundary checking
+            if (playerX < 0) {
+                playerX = 0;
+            }
+            if (playerX > canvas.width - playerWidth) {
+                playerX = canvas.width - playerWidth;
+            }
+        }
+
+        function checkCollisions() {
+            for (let i = 0; i < objects.length; i++) {
+                const obj = objects[i];
+
+                // Check if object is below the collector's height level
+                if (obj.y + obj.size >= canvas.height - playerHeight) {
+                    
+                    // Check if object is horizontally aligned with the player
+                    if (obj.x + obj.size > playerX && obj.x < playerX + playerWidth) {
+                        // Collision occurred
+                        
+                        if (obj.type === 0) { // Gem (Good)
+                            score++;
+                            objects.splice(i, 1);
+                            i--;
+                        } else { // Debris (Bad)
+                            gameOver();
+                            return; // End collision check early on Game Over
+                        }
+                    } else if (obj.y > canvas.height) {
+                        // Object missed (and wasn't debris) - remove only if missed
+                        if (obj.type === 0) { 
+                            // Missing a gem doesn't cause game over, but let's remove it
+                            objects.splice(i, 1);
+                            i--;
+                        } else {
+                            // Debris missed - just remove it
+                            objects.splice(i, 1);
+                            i--;
+                        }
+                    }
+                } else if (obj.y > canvas.height) {
+                    // Object fell off the bottom (Gem or Debris)
+                    objects.splice(i, 1);
+                    i--;
+                }
+            }
+        }
+
+        function updateGame() {
+            // 1. Clear the canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 2. Update and Draw Player
+            updatePlayerPosition();
+            drawPlayer();
+
+            // 3. Update, Draw, and Check Objects
+            for (const obj of objects) {
+                obj.update();
+                obj.draw();
+            }
+
+            // 4. Check for Collisions and Misses
+            checkCollisions();
+
+            // 5. Update Score Display
+            scoreDisplay.textContent = `SCORE: ${score}`;
+            
+            // 6. Loop
+            if (gameRunning) {
+                animationFrameId = requestAnimationFrame(updateGame);
+            }
+        }
+
+        function resetGame() {
+            score = 0;
+            objects = [];
+            playerX = (canvas.width - playerWidth) / 2;
+            isMovingLeft = false;
+            isMovingRight = false;
+            scoreDisplay.textContent = `SCORE: 0`;
+            messageBox.style.display = 'none';
+        }
+
+        function startGame() {
+            if (gameRunning) return;
+
+            resetGame();
+            gameRunning = true;
+            startButton.style.display = 'none';
+
+            // Start the object spawner
+            objectInterval = setInterval(spawnObject, OBJECT_SPAWN_RATE);
+            
+            // Start the game loop
+            updateGame();
+        }
+
+        function gameOver() {
+            gameRunning = false;
+            clearInterval(objectInterval);
+            cancelAnimationFrame(animationFrameId);
+
+            // Update High Score
+            if (score > highScore) {
+                highScore = score;
+                localStorage.setItem('cosmicCollectorHighScore', highScore);
+            }
+            highScoreDisplay.textContent = `HIGH SCORE: ${highScore}`;
+
+            // Show Game Over message
+            messageTitle.textContent = "GAME OVER!";
+            messageText.textContent = `You scored ${score} points. Try again to beat the high score!`;
+            messageBox.style.display = 'flex';
+            startButton.style.display = 'block';
+            startButton.textContent = 'RESTART GAME';
+        }
+        
+        function showStartMessage() {
+            messageTitle.textContent = "COSMIC COLLECTOR";
+            messageText.innerHTML = `
+                <p>Catch the <span style="color:#00ff88; text-shadow:0 0 5px #00ff88;">Green Gems</span> (◆) to score points.</p>
+                <p>Avoid the <span style="color:#ff0077; text-shadow:0 0 5px #ff0077;">Red Debris</span> (●) or the game ends!</p>
+                <p>Use ← and → keys or the on-screen buttons to move.</p>
+            `;
+            messageBox.style.display = 'flex';
+        }
+
+        // --- Input Handling (Keyboard) ---
+
+        document.addEventListener('keydown', (e) => {
+            if (!gameRunning) return;
+            if (e.key === 'ArrowLeft' || e.key === 'A' || e.key === 'a') {
+                isMovingLeft = true;
+            } else if (e.key === 'ArrowRight' || e.key === 'D' || e.key === 'd') {
+                isMovingRight = true;
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            if (e.key === 'ArrowLeft' || e.key === 'A' || e.key === 'a') {
+                isMovingLeft = false;
+            } else if (e.key === 'ArrowRight' || e.key === 'D' || e.key === 'd') {
+                isMovingRight = false;
+            }
+        });
+
+        // --- Input Handling (Touch/Mobile Controls) ---
+        
+        const leftButton = document.getElementById('leftButton');
+        const rightButton = document.getElementById('rightButton');
+
+        function handleTouchStart(e, direction) {
+            e.preventDefault(); // Prevent scrolling/default touch actions
+            if (!gameRunning) return;
+
+            if (direction === 'left') {
+                isMovingLeft = true;
+            } else if (direction === 'right') {
+                isMovingRight = true;
+            }
+        }
+
+        function handleTouchEnd(e, direction) {
+            e.preventDefault();
+            if (direction === 'left') {
+                isMovingLeft = false;
+            } else if (direction === 'right') {
+                isMovingRight = false;
+            }
+        }
+
+        leftButton.addEventListener('touchstart', (e) => handleTouchStart(e, 'left'));
+        leftButton.addEventListener('touchend', (e) => handleTouchEnd(e, 'left'));
+        leftButton.addEventListener('mousedown', (e) => handleTouchStart(e, 'left'));
+        leftButton.addEventListener('mouseup', (e) => handleTouchEnd(e, 'left'));
+        
+        rightButton.addEventListener('touchstart', (e) => handleTouchStart(e, 'right'));
+        rightButton.addEventListener('touchend', (e) => handleTouchEnd(e, 'right'));
+        rightButton.addEventListener('mousedown', (e) => handleTouchStart(e, 'right'));
+        rightButton.addEventListener('mouseup', (e) => handleTouchEnd(e, 'right'));
+
+        // --- Initial Setup ---
+        startButton.addEventListener('click', startGame);
+        fullscreenButton.addEventListener('click', toggleFullScreen); // New listener for fullscreen
+
+    </script>
+</body>
+</html>
