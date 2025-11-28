@@ -1,10 +1,10 @@
 <div align="center">
 
-<h3>🎮 Free Fun HTML Games</h3>
+<h2>🎮 Free Fun HTML Games</h2>
 
-<p>━━━━━━━━━━━━ ✦ ━━━━━━━━━━━━</p>
+<p>━━━━━━━━━━━━ ✦ ━━━━━━━━━━━━</p>   
 
-<h5><i>All games are under testing & improvement 🔧✨</i></h5>
+_All games are under testing & improvement 🔧✨_
 
 <p>━━━━━━━━━━━━ ✦ ━━━━━━━━━━━━</p>
 
@@ -14,3 +14,4 @@
 
 - Fast, fun HTML games  
 - Cool experimental projects  
+
